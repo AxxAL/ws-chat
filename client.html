@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js" integrity="sha384-c79GN5VsunZvi+Q/WObgk2in0CbZsHnjEqvFxC5DxHn9lTfNce2WW6h2pH6u/kF+" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <title>Chat</title>
+</head>
+<body>
+    <div id="disconnected-window">
+        <h1 class="is-size-1 has-text-centered has-text-danger">Disconnected.</h1>
+        <h2 class="is-size-5 has-text-centered has-text-grey-light">Attempting to reconnect...</h2>
+    </div>
+
+    <div id="chat-window">
+        <div id="messages" class="messages" style="height: 90.001vh;">
+            <div class="scroll-anchor"></div>
+        </div>
+        <input class="input" style="height: 10vh;" type="text" id="input" placeholder="Send a message">
+    </div>
+
+    <script>
+        const statusElement = document.getElementById("status");
+        const messagesElement = document.getElementById("messages");
+        const messagesAnchor = document.getElementById("scroll-anchor");
+        const inputElement = document.getElementById("input");
+        const socket = io("ws://9.134.210.85:3000");
+        
+        socket.on("connect", onConnect);
+        socket.on("disconnect", onDisconnect);
+        socket.on("serverMessage", addMessage);
+        socket.on("history", onHistory);
+
+        document.addEventListener("keypress", event => {
+            if (event.key !== "Enter") return;
+            sendMessage();
+        });
+
+        function addMessage(data) {
+            const item = document.createElement("p");
+            item.textContent = `[${data.timestamp.split(" ")[0]}] ${data.sender.name} >> ${data.message}`;
+            item.classList = "box";
+            messagesElement.insertBefore(item, messagesAnchor);
+        }
+
+        function onHistory(data) {
+            data.forEach(item => addMessage(item));
+        }
+
+        function onConnect() {
+            console.log("Connected to socket.");
+            document.getElementById("disconnected-window").hidden = true;
+            document.getElementById("chat-window").hidden = false;
+        }
+
+        function onDisconnect() {
+            console.log("Disonnected from socket.");
+            document.getElementById("chat-window").hidden = true;
+            document.getElementById("disconnected-window").hidden = false;
+        }
+
+        function sendMessage() {
+            const message = inputElement.value;
+            if (message == "" || message == undefined) return;
+            inputElement.value = "";
+            socket.emit("clientMessage", { message: message });
+        }
+
+        // Smooth scrolling
+        messagesElement.scrollTo({ left: 0, top: messagesElement.scrollHeight, behavior: "smooth" });
+
+        // Scroll down on new message
+        const observer = new MutationObserver((mutationsList, observer) => {
+            for (let mutation of mutationsList) {
+                if (mutation.type === "childList") {
+                messagesElement.scrollTo(0, messagesElement.scrollHeight);
+                }
+            }
+        });
+        observer.observe(messagesElement, { childList: true });
+    </script>
+</body>
+</html>
+
+<style>
+body {
+    overflow: hidden;
+}
+.messages {
+    overflow-y: auto;
+}
+.messages * {
+    overflow-anchor: none;
+}
+.scroll-anchor {
+    overflow-anchor: auto;
+    height: 1px;
+}
+</style>
